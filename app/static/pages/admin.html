@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin · SmartShop AI</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+<div class="container">
+  <div class="hero" style="padding-top:24px; text-align:left; max-width:100%; margin:0;">
+    <h1>Admin dashboard</h1>
+    <p>Track orders, search activity, and model health from one place.</p>
+  </div>
+
+  <div id="summary"></div>
+
+  <div class="dashboard-grid">
+    <div class="panel">
+      <h3 style="margin-top:0">Model performance</h3>
+      <div id="modelHealth" class="metric-list"></div>
+    </div>
+    <div class="panel">
+      <h3 style="margin-top:0">Recent orders</h3>
+      <div id="orders" class="table-wrap"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:20px;">
+    <h3 style="margin-top:0">Recent searches</h3>
+    <div id="searches" class="table-wrap"></div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+renderNav('admin');
+
+async function load() {
+  if (!Auth.isAdmin()) {
+    document.getElementById('summary').innerHTML = '<div class="empty-state">Admin access is required to view this dashboard.</div>';
+    return;
+  }
+  try {
+    const data = await apiFetch('/admin/summary');
+    render(data);
+  } catch (err) {
+    document.getElementById('summary').innerHTML = `<div class="empty-state">Could not load admin data: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function render(data) {
+  document.getElementById('summary').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="value">${data.total_users}</div><div class="label">Users</div></div>
+      <div class="stat-card"><div class="value">${data.total_admins}</div><div class="label">Admins</div></div>
+      <div class="stat-card"><div class="value">${data.total_searches}</div><div class="label">Searches</div></div>
+      <div class="stat-card"><div class="value">${data.total_click_throughs}</div><div class="label">Tracked orders</div></div>
+      <div class="stat-card"><div class="value">${data.total_comparisons}</div><div class="label">Comparisons</div></div>
+      <div class="stat-card"><div class="value">${data.average_results_per_search}</div><div class="label">Avg results / search</div></div>
+    </div>
+  `;
+
+  document.getElementById('modelHealth').innerHTML = `
+    <div class="metric-row"><span>Apify configured</span><strong>${data.apify_configured ? 'Yes' : 'No'}</strong></div>
+    <div class="metric-row"><span>LLM provider</span><strong>${escapeHtml(data.llm_provider)}</strong></div>
+    <div class="metric-row"><span>Searches with results</span><strong>${data.searches_with_results}</strong></div>
+    <div class="metric-row"><span>Searches without results</span><strong>${data.searches_without_results}</strong></div>
+    <div class="metric-row"><span>Warning rate</span><strong>${data.warning_rate_pct}%</strong></div>
+    <div class="metric-row"><span>Click-through rate</span><strong>${data.click_through_rate_pct}%</strong></div>
+  `;
+
+  document.getElementById('orders').innerHTML = tableHtml(
+    ['Platform', 'Product', 'Time'],
+    data.recent_click_throughs.map(item => [item.platform || 'Unknown', item.title, item.created_at ? new Date(item.created_at).toLocaleString() : ''])
+  );
+
+  document.getElementById('searches').innerHTML = tableHtml(
+    ['Query', 'Results', 'Warnings', 'Time'],
+    data.recent_searches.map(item => [item.query, String(item.result_count), String(item.warning_count), item.created_at ? new Date(item.created_at).toLocaleString() : ''])
+  );
+}
+
+function tableHtml(headers, rows) {
+  if (!rows.length) {
+    return '<div class="empty-state">No activity recorded yet.</div>';
+  }
+  return `
+    <table class="compare-table">
+      <tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>
+      ${rows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}
+    </table>
+  `;
+}
+
+load();
+</script>
+</body>
+</html>

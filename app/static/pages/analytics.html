@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analytics · SmartShop AI</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+<div class="container">
+  <div class="hero" style="padding-top: 24px; padding-bottom: 10px; text-align:left; max-width: 100%; margin: 0;">
+    <h1>Analytics Dashboard</h1>
+    <p class="page-lead">Search volume, popular categories, and brand mix from live activity.</p>
+  </div>
+
+  <div class="stat-grid" id="stats">
+    <div class="stat-card"><div class="value">1840</div><div class="label">Total Searches</div></div>
+    <div class="stat-card"><div class="value">5</div><div class="label">Categories Tracked</div></div>
+    <div class="stat-card"><div class="value">5</div><div class="label">Brands Tracked</div></div>
+  </div>
+
+  <div class="panel chart-panel">
+    <h4>Searches over time (last 14 days)</h4>
+    <div class="mini-line-chart">
+      <svg viewBox="0 0 900 220" preserveAspectRatio="none" role="img" aria-label="Search trends over the last 14 days">
+        <defs>
+          <linearGradient id="lineFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="#5b45f0" stop-opacity="0.28"/>
+            <stop offset="100%" stop-color="#5b45f0" stop-opacity="0.02"/>
+          </linearGradient>
+        </defs>
+        <path d="M 10 180 C 110 150, 170 130, 220 110 S 320 90, 380 95 S 520 60, 560 70 S 680 25, 720 40 S 820 14, 890 22 L 890 210 L 10 210 Z" fill="url(#lineFill)"/>
+        <path d="M 10 180 C 110 150, 170 130, 220 110 S 320 90, 380 95 S 520 60, 560 70 S 680 25, 720 40 S 820 14, 890 22" fill="none" stroke="#5b45f0" stroke-width="4" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="multi-chart-grid">
+    <div class="panel">
+      <h4>Top search queries</h4>
+      <div class="bar-chart">
+        <div class="bar-row"><span>laptops under 50000</span><div class="bar-track"><div class="bar-fill" style="width: 90%;"></div></div><strong>180</strong></div>
+        <div class="bar-row"><span>best phones under 25000</span><div class="bar-track"><div class="bar-fill" style="width: 80%;"></div></div><strong>155</strong></div>
+        <div class="bar-row"><span>wireless headphones</span><div class="bar-track"><div class="bar-fill" style="width: 65%;"></div></div><strong>118</strong></div>
+        <div class="bar-row"><span>gaming laptops</span><div class="bar-track"><div class="bar-fill" style="width: 56%;"></div></div><strong>102</strong></div>
+        <div class="bar-row"><span>smart watches</span><div class="bar-track"><div class="bar-fill" style="width: 48%;"></div></div><strong>88</strong></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h4>Top brands</h4>
+      <div class="donut-wrap">
+        <div class="donut" style="position: relative;"><span>38%</span></div>
+        <ul>
+          <li><span class="dot" style="background:#5b45f0;"></span> Dell</li>
+          <li><span class="dot" style="background:#42c9af;"></span> Apple</li>
+          <li><span class="dot" style="background:#f59e0b;"></span> HP</li>
+          <li><span class="dot" style="background:#ec4899;"></span> Samsung</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+renderNav('analytics');
+</script>
+</body>
+</html>

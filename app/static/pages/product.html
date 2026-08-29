@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product · SmartShop AI</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+<div class="container" id="content"><div class="spinner"></div></div>
+
+<script src="/static/js/app.js"></script>
+<script>
+renderNav('home');
+const params = new URLSearchParams(location.search);
+const productId = params.get('id');
+const content = document.getElementById('content');
+
+async function load() {
+  if (!productId) { content.innerHTML = '<div class="empty-state">No product specified.</div>'; return; }
+  try {
+    const [product, cross, revSummary, recs] = await Promise.all([
+      apiFetch(`/products/${productId}`),
+      apiFetch(`/products/${productId}/cross-platform`).catch(() => null),
+      apiFetch(`/products/${productId}/reviews/summary`).catch(() => null),
+      apiFetch(`/products/${productId}/recommendations`).catch(() => null),
+    ]);
+    render(product, cross, revSummary, recs);
+  } catch (err) {
+    content.innerHTML = `<div class="empty-state">Could not load product: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function offerRow(product, o) {
+  return `
+    <div class="offer-row">
+      <div>
+        <span class="badge badge-${o.platform}">${o.platform}</span>
+        <div class="price" style="margin-top:6px">${fmtPrice(o.price)}</div>
+        <div class="meta">${fmtRating(o.rating)} · ${fmtReviews(o.review_count)}</div>
+      </div>
+      <a class="btn btn-primary" href="${o.url}" target="_blank" rel="noopener" data-product-id="${product.id}" data-offer-id="${o.id || ''}" data-platform="${o.platform}" data-title="${escapeHtml(o.title)}" data-url="${escapeHtml(o.url)}" onclick="trackOutboundClick(this)">Open on ${o.platform === 'amazon' ? 'Amazon' : 'Flipkart'}</a>
+    </div>
+  `;
+}
+
+function recSection(title, items) {
+  if (!items || !items.length) return '';
+  const sectionClass = title === 'Frequently bought together' ? 'glass-section glass-bundle' : 'glass-section glass-similar';
+  return `
+    <div class="section-title">${title}</div>
+    <div class="${sectionClass}">
+      <div class="grid">${items.map(r => productCardHtml({ ...r.product, rec_type: r.rec_type, ai_reason: r.reason })).join('')}</div>
+    </div>
+  `;
+}
+
+function render(product, cross, revSummary, recs) {
+  const specs = Object.entries(product.specifications || {}).slice(0, 12)
+    .map(([k,v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`).join('');
+
+  content.innerHTML = `
+    <div class="panel product-hero">
+      <div class="product-image-wrap">
+        <img src="${product.primary_image_url || 'https://via.placeholder.com/300x220?text=No+Image'}" alt="${escapeHtml(product.canonical_title)}" />
+      </div>
+      <div class="product-summary">
+        <div class="product-kicker">Product details</div>
+        <h1>${escapeHtml(product.canonical_title)}</h1>
+        <div class="meta">${escapeHtml(product.brand || 'Unknown brand')}${product.category ? ' · ' + escapeHtml(product.category) : ''}</div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:12px;">
+          <div>
+            <div class="price product-price">${fmtPrice(product.best_price)}</div>
+            <div class="meta product-stats">${fmtRating(product.avg_rating)} · ${fmtReviews(product.total_reviews)}</div>
+          </div>
+          <a class="btn btn-primary ai-icon-btn" style="white-space:nowrap; height:fit-content; padding: 10px 16px;" href="/assistant?product=${product.id}">Ask AI</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Platform Offers &amp; AI Verdict</div>
+    <div class="panel panel-glass-neutral">
+      ${(product.offers || []).map(o => offerRow(product, o)).join('') || '<p class="empty-state">No offers available.</p>'}
+      ${cross ? `
+        <div class="section-title" style="margin-top:18px; margin-bottom:12px;">★ AI Verdict</div>
+        <div class="ai-verdict-card">
+          <div class="ai-verdict-heading">Best choice: ${escapeHtml(cross.best_platform || 'Not enough data')}</div>
+          <p class="ai-verdict-text">${escapeHtml(cross.ai_verdict || 'No cross-platform verdict available.')}</p>
+        </div>
+      ` : ''}
+    </div>
+
+    ${specs ? `<div class="section-title">Specifications</div><div class="panel panel-glass-neutral"><table class="compare-table">${specs}</table></div>` : ''}
+
+    <div class="section-title">Sentiment analysis</div>
+    <div class="panel panel-glass-neutral">
+      ${revSummary ? `
+        <div class="stat-grid" style="margin-bottom:16px;">
+          <div class="stat-card"><div class="value">${revSummary.positive_pct}%</div><div class="label">Positive</div></div>
+          <div class="stat-card"><div class="value">${revSummary.neutral_pct}%</div><div class="label">Neutral</div></div>
+          <div class="stat-card"><div class="value">${revSummary.negative_pct}%</div><div class="label">Negative</div></div>
+          <div class="stat-card"><div class="value">${revSummary.total_reviews_analyzed}</div><div class="label">Reviews analyzed</div></div>
+        </div>
+        <p>${escapeHtml(revSummary.summary_text)}</p>
+        ${revSummary.common_positive_points.length ? `<p><strong>Common praise:</strong> ${revSummary.common_positive_points.map(escapeHtml).join(', ')}</p>` : ''}
+        ${revSummary.common_complaints.length ? `<p><strong>Common complaints:</strong> ${revSummary.common_complaints.map(escapeHtml).join(', ')}</p>` : ''}
+      ` : '<p class="empty-state">No review data available yet.</p>'}
+    </div>
+
+    ${recs ? recSection('Frequently bought together', recs.associated_bundles) : ''}
+    ${recs ? recSection('Other similar products', recs.similar) : ''}
+  `;
+}
+
+load();
+</script>
+</body>
+</html>

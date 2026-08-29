@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register · SmartShop AI</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+<div class="container">
+  <div class="auth-box panel">
+    <h2>Create account</h2>
+    <p class="subtle-center">Choose the access level for this account.</p>
+    <form id="registerForm">
+      <input id="fullName" type="text" placeholder="Full name" autocomplete="name" />
+      <input id="email" type="email" placeholder="Email" autocomplete="email" required />
+      <input id="password" type="password" placeholder="Password (min 8 characters)" autocomplete="new-password" required />
+      <label class="field-label" for="role">Account type</label>
+      <select id="role">
+        <option value="user" selected>User</option>
+        <option value="admin">Admin</option>
+      </select>
+      <div id="adminInviteWrap" style="display:none;">
+        <label class="field-label" for="inviteCode">Admin invite code</label>
+        <input id="inviteCode" type="password" placeholder="Invite code" autocomplete="off" />
+      </div>
+      <p class="helper-text">Admin accounts can access the dashboard, order tracking, and model performance views.</p>
+      <button class="btn btn-primary" style="width:100%" type="submit" id="registerBtn">Create account</button>
+    </form>
+    <p id="error" style="color:var(--danger); font-size:13px;"></p>
+    <p style="text-align:center; font-size:13px; color:var(--muted)">Already have an account? <a href="/login" style="color:var(--primary)">Sign in</a></p>
+  </div>
+</div>
+<script src="/static/js/app.js"></script>
+<script>
+renderNav('register');
+const roleSelect = document.getElementById('role');
+const adminInviteWrap = document.getElementById('adminInviteWrap');
+const inviteCodeInput = document.getElementById('inviteCode');
+
+function syncInviteField() {
+  const isAdmin = roleSelect.value === 'admin';
+  adminInviteWrap.style.display = isAdmin ? 'block' : 'none';
+  inviteCodeInput.required = isAdmin;
+  if (!isAdmin) inviteCodeInput.value = '';
+}
+
+roleSelect.addEventListener('change', syncInviteField);
+syncInviteField();
+
+document.getElementById('registerForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const full_name = document.getElementById('fullName').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const role = document.getElementById('role').value;
+  const invite_code = document.getElementById('inviteCode').value.trim() || null;
+  try {
+    await apiFetch('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, full_name, role, invite_code }) });
+    const res = await apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    Auth.setToken(res.access_token);
+    const user = await apiFetch('/auth/me');
+    Auth.setUser(user);
+    location.href = user.role === 'admin' ? '/admin' : '/';
+  } catch (err) {
+    document.getElementById('error').textContent = err.message;
+  }
+});
+</script>
+</body>
+</html>

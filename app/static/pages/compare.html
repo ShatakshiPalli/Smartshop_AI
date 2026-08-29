@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compare · SmartShop AI</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+<div class="container" id="content"><div class="spinner"></div></div>
+
+<script src="/static/js/app.js"></script>
+<script>
+renderNav('home');
+const params = new URLSearchParams(location.search);
+const ids = (params.get('ids') || '').split(',').filter(Boolean);
+const content = document.getElementById('content');
+
+async function load() {
+  if (ids.length < 2) { content.innerHTML = '<div class="empty-state">Select at least 2 products from search results to compare.</div>'; return; }
+  try {
+    const result = await apiFetch('/products/compare', { method: 'POST', body: JSON.stringify({ product_ids: ids }) });
+    render(result);
+  } catch (err) {
+    content.innerHTML = `<div class="empty-state">Could not compare: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function render(result) {
+  const pids = Object.keys(result.comparison_table);
+  const rows = ['best_price', 'avg_rating', 'total_reviews', 'platforms']
+    .map(field => {
+      const label = { best_price: 'Best Price', avg_rating: 'Avg Rating', total_reviews: 'Total Reviews', platforms: 'Available On' }[field];
+      const cells = pids.map(pid => {
+        const v = result.comparison_table[pid][field];
+        if (field === 'best_price') return fmtPrice(v);
+        if (field === 'avg_rating') return fmtRating(v);
+        if (field === 'total_reviews') return fmtReviews(v);
+        if (field === 'platforms') return (v || []).join(', ');
+        return escapeHtml(v ?? '—');
+      });
+      return `<tr><th>${label}</th>${cells.map(c => `<td>${c}</td>`).join('')}</tr>`;
+    }).join('');
+
+  content.innerHTML = `
+    <div class="section-title">Comparing ${pids.length} products</div>
+    <div class="grid">${result.products.map(p => productCardHtml(p)).join('')}</div>
+
+    <div class="section-title">Comparison Table</div>
+    <div class="panel" style="overflow-x:auto">
+      <table class="compare-table">
+        <tr><th>Product</th>${pids.map(pid => `<td>${escapeHtml(result.comparison_table[pid].title)}</td>`).join('')}</tr>
+        ${rows}
+      </table>
+    </div>
+
+    ${Object.keys(result.ai_summaries || {}).length ? `
+      <div class="section-title">★ AI Verdict</div>
+      <div class="ai-verdict-card">
+        <div class="ai-verdict-heading">Best overall comparison</div>
+        <p class="ai-verdict-text">${escapeHtml(result.explanation || 'No comparison verdict available.')}</p>
+        ${result.best_overall ? `<p class="ai-verdict-text ai-verdict-compact"><strong>Best overall:</strong> ${escapeHtml(result.comparison_table[result.best_overall].title)}</p>` : ''}
+        ${result.best_value ? `<p class="ai-verdict-text ai-verdict-compact"><strong>Best value:</strong> ${escapeHtml(result.comparison_table[result.best_value].title)}</p>` : ''}
+      </div>
+    ` : ''}
+
+    <div class="section-title">Pros &amp; Cons</div>
+    <div class="grid">
+      ${pids.map(pid => `
+        <div class="panel">
+          <h4>${escapeHtml(result.comparison_table[pid].title)}</h4>
+          <div><strong>Pros</strong></div>
+          ${(result.pros_cons[pid].pros || []).map(p => `<div class="pill pill-pos">${escapeHtml(p)}</div>`).join('') || '<div class="pill">No pros listed</div>'}
+          <div style="margin-top:10px"><strong>Cons</strong></div>
+          ${(result.pros_cons[pid].cons || []).map(c => `<div class="pill pill-neg">${escapeHtml(c)}</div>`).join('') || '<div class="pill">No cons listed</div>'}
+        </div>
+      `).join('')}
+    </div>
+
+  `;
+}
+
+load();
+</script>
+</body>
+</html>

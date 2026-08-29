@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartShop AI — Discover, Compare, and Shop Smarter with AI</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<div class="container">
+  <div class="hero">
+    <h1>Discover, Compare, and Shop Smarter <span style="color:var(--primary)">with AI</span></h1>
+    <p>Live prices and ratings from Amazon &amp; Flipkart, ranked and explained by AI.</p>
+    <div class="search-bar">
+      <input id="searchInput" type="text" placeholder="e.g. Best laptops under ₹50,000" />
+      <button class="btn btn-primary" id="searchBtn">Search</button>
+    </div>
+    <div class="filters-row">
+      <input id="maxPrice" type="number" placeholder="Max price (₹)" />
+      <input id="minRating" type="number" step="0.1" min="0" max="5" placeholder="Min rating" />
+      <select id="category">
+        <option value="">Any category</option>
+        <option value="laptops">Laptops</option>
+        <option value="mobiles">Mobiles</option>
+        <option value="headphones">Headphones</option>
+        <option value="tv">TVs</option>
+        <option value="appliances">Appliances</option>
+      </select>
+      <select id="sortBy">
+        <option value="ai">Sort: AI Recommended</option>
+        <option value="price_asc">Price: Low to High</option>
+        <option value="price_desc">Price: High to Low</option>
+        <option value="rating">Rating</option>
+        <option value="reviews">Most Reviewed</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="warnings"></div>
+  <div id="resultsHeader"></div>
+  <div id="results"></div>
+
+  <div id="compareBar" style="display:none; position:sticky; bottom:16px; text-align:center; margin-top:20px;">
+    <button class="btn btn-primary" onclick="goCompare()">Compare selected</button>
+  </div>
+</div>
+
+<div class="ai-assistant-fab">
+  <a href="/assistant" title="Ask the AI Assistant">Ask AI</a>
+</div>
+
+<footer>SmartShop AI · Live data via Apify · Prices &amp; ratings sourced directly from Amazon and Flipkart</footer>
+
+<script src="/static/js/app.js"></script>
+<script>
+renderNav('home');
+
+const resultsEl = document.getElementById('results');
+const warningsEl = document.getElementById('warnings');
+const headerEl = document.getElementById('resultsHeader');
+let lastProducts = [];
+
+document.getElementById('searchBtn').addEventListener('click', runSearch);
+document.getElementById('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+document.getElementById('sortBy').addEventListener('change', () => renderResults(lastProducts));
+
+async function runSearch() {
+  const query = document.getElementById('searchInput').value.trim();
+  if (!query) return;
+  const maxPrice = document.getElementById('maxPrice').value || null;
+  const minRating = document.getElementById('minRating').value || null;
+  const category = document.getElementById('category').value || null;
+
+  resultsEl.innerHTML = '<div class="spinner"></div>';
+  warningsEl.innerHTML = '';
+  headerEl.innerHTML = '';
+
+  try {
+    const payload = {
+      query,
+      max_price: maxPrice ? Number(maxPrice) : null,
+      min_rating: minRating ? Number(minRating) : null,
+      category,
+      limit: 20,
+    };
+    const data = await apiFetch('/search', { method: 'POST', body: JSON.stringify(payload) });
+    lastProducts = data.products;
+
+    if (data.warnings && data.warnings.length) {
+      warningsEl.innerHTML = data.warnings.map(w => `<div class="warning-banner">Warning: ${escapeHtml(w)}</div>`).join('');
+    }
+    headerEl.innerHTML = `<div class="section-title">${data.total_results} result${data.total_results === 1 ? '' : 's'} for "${escapeHtml(data.query)}"</div>`;
+    renderResults(lastProducts);
+  } catch (err) {
+    resultsEl.innerHTML = `<div class="empty-state">Something went wrong: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderResults(products) {
+  if (!products || !products.length) {
+    resultsEl.innerHTML = '<div class="empty-state">No products found. Try a different search, or check your Apify configuration in .env.</div>';
+    document.getElementById('compareBar').style.display = 'none';
+    return;
+  }
+  const sortBy = document.getElementById('sortBy').value;
+  const sorted = [...products];
+  if (sortBy === 'price_asc') sorted.sort((a,b) => (a.best_price ?? Infinity) - (b.best_price ?? Infinity));
+  if (sortBy === 'price_desc') sorted.sort((a,b) => (b.best_price ?? -1) - (a.best_price ?? -1));
+  if (sortBy === 'rating') sorted.sort((a,b) => (b.avg_rating ?? 0) - (a.avg_rating ?? 0));
+  if (sortBy === 'reviews') sorted.sort((a,b) => (b.total_reviews ?? 0) - (a.total_reviews ?? 0));
+
+  resultsEl.innerHTML = `<div class="grid">${sorted.map(p => productCardHtml(p, { selectable: true })).join('')}</div>`;
+  document.querySelectorAll('.compare-check').forEach(cb => cb.addEventListener('change', updateCompareBar));
+}
+
+function updateCompareBar() {
+  const checked = document.querySelectorAll('.compare-check:checked');
+  document.getElementById('compareBar').style.display = checked.length >= 2 ? 'block' : 'none';
+}
+
+function goCompare() {
+  const ids = Array.from(document.querySelectorAll('.compare-check:checked')).map(cb => cb.value);
+  location.href = `/compare?ids=${ids.join(',')}`;
+}
+</script>
+</body>
+</html>
